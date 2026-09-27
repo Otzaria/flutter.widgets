@@ -180,6 +180,9 @@ class _PositionedListState extends State<PositionedList> {
           slivers: <Widget>[
             if (widget.positionedIndex > 0)
               SliverPadding(
+                // Keyed by positionedIndex so a jump drops children that
+                // carry layout offsets measured for another item/width.
+                key: ValueKey('lead${widget.positionedIndex}'),
                 padding: _leadingSliverPadding,
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
@@ -215,6 +218,7 @@ class _PositionedListState extends State<PositionedList> {
             if (widget.positionedIndex >= 0 &&
                 widget.positionedIndex < widget.itemCount - 1)
               SliverPadding(
+                key: ValueKey('trail${widget.positionedIndex}'),
                 padding: _trailingSliverPadding,
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
