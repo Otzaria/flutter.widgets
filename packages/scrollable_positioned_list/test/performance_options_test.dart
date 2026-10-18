@@ -89,4 +89,54 @@ void main() {
       expect(isBuilt(118), isFalse);
     });
   });
+
+  group('item positions', () {
+    testWidgets('a scroll that moves no position does not notify',
+        (WidgetTester tester) async {
+      final itemPositionsListener = ItemPositionsListener.create();
+      await pumpList(tester, itemPositionsListener: itemPositionsListener);
+      var notifications = 0;
+      itemPositionsListener.itemPositions.addListener(() => notifications++);
+      final position =
+          tester.state<ScrollableState>(find.byType(Scrollable)).position;
+
+      position.jumpTo(position.pixels + 10);
+      await tester.pump();
+      expect(notifications, 1);
+      final moved = itemPositionsListener.itemPositions.value;
+
+      position.jumpTo(position.pixels + 0.2);
+      await tester.pump();
+      expect(notifications, 1);
+      expect(itemPositionsListener.itemPositions.value, moved);
+    });
+
+    testWidgets('a rebuild notifies even when positions are unchanged',
+        (WidgetTester tester) async {
+      final itemPositionsListener = ItemPositionsListener.create();
+      await pumpList(tester, itemPositionsListener: itemPositionsListener);
+      final before = itemPositionsListener.itemPositions.value.toList();
+      var notifications = 0;
+      itemPositionsListener.itemPositions.addListener(() => notifications++);
+
+      await pumpList(tester, itemPositionsListener: itemPositionsListener);
+
+      expect(notifications, 1);
+      expect(itemPositionsListener.itemPositions.value, before);
+    });
+
+    testWidgets('only items intersecting the viewport are reported',
+        (WidgetTester tester) async {
+      final itemPositionsListener = ItemPositionsListener.create();
+      await pumpList(
+        tester,
+        itemPositionsListener: itemPositionsListener,
+        initialIndex: 100,
+      );
+
+      final indices =
+          itemPositionsListener.itemPositions.value.map((p) => p.index);
+      expect(indices.toSet(), {for (var i = 100; i < 110; i++) i});
+    });
+  });
 }

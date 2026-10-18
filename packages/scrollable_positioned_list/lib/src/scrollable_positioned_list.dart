@@ -655,7 +655,8 @@ class _ScrollablePositionedListState extends State<ScrollablePositionedList>
   void _updatePositions() {
     final itemPositions = primary.itemPositionsNotifier.itemPositions.value
         .where((ItemPosition position) =>
-            position.itemLeadingEdge < 1 && position.itemTrailingEdge > 0);
+            position.itemLeadingEdge < 1 && position.itemTrailingEdge > 0)
+        .toList();
     if (itemPositions.isNotEmpty) {
       PageStorage.of(context).writeState(
           context,
