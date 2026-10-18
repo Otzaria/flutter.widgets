@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
@@ -158,9 +160,9 @@ void main() {
       );
 
       var completed = false;
-      itemScrollController
+      unawaited(itemScrollController
           .scrollTo(index: 200, duration: const Duration(seconds: 1))
-          .then((_) => completed = true);
+          .then((_) => completed = true));
       await tester.pump();
 
       expect(fadeTransitionFinder, findsOneWidget);
@@ -179,9 +181,9 @@ void main() {
       );
 
       var completed = false;
-      itemScrollController
+      unawaited(itemScrollController
           .scrollTo(index: 20, duration: const Duration(seconds: 1))
-          .then((_) => completed = true);
+          .then((_) => completed = true));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 750));
 
@@ -197,8 +199,8 @@ void main() {
       final itemScrollController = ItemScrollController();
       await pumpList(tester, itemScrollController: itemScrollController);
 
-      itemScrollController.scrollTo(
-          index: 200, duration: const Duration(seconds: 1));
+      unawaited(itemScrollController.scrollTo(
+          index: 200, duration: const Duration(seconds: 1)));
       await tester.pump();
       await tester.pump();
 
