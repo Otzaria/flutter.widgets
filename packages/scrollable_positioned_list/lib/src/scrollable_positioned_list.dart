@@ -58,6 +58,7 @@ class ScrollablePositionedList extends StatefulWidget {
     this.addRepaintBoundaries = true,
     this.minCacheExtent,
     this.cacheExtentScreens = _screenScrollCount,
+    this.jumpToDistantItems = false,
   })  : assert(itemCount != null),
         assert(cacheExtentScreens >= 0),
         assert(itemBuilder != null),
@@ -90,6 +91,7 @@ class ScrollablePositionedList extends StatefulWidget {
     this.addRepaintBoundaries = true,
     this.minCacheExtent,
     this.cacheExtentScreens = _screenScrollCount,
+    this.jumpToDistantItems = false,
   })  : assert(itemCount != null),
         assert(cacheExtentScreens >= 0),
         assert(itemBuilder != null),
@@ -199,6 +201,14 @@ class ScrollablePositionedList extends StatefulWidget {
   /// already laid out; farther items are reached with the two-list fade.
   /// [minCacheExtent] still applies as a lower bound. Defaults to 2.
   final double cacheExtentScreens;
+
+  /// Whether [ItemScrollController.scrollTo] jumps to an item that is not laid
+  /// out instead of cross-fading to it in a second list.
+  ///
+  /// The cross-fade lays out a second list around the target while both lists
+  /// animate. When true, only the jump's layout is paid, and the returned
+  /// future completes after the frame that shows the target. Defaults to false.
+  final bool jumpToDistantItems;
 
   @override
   State<StatefulWidget> createState() => _ScrollablePositionedListState();
@@ -568,6 +578,9 @@ class _ScrollablePositionedListState extends State<ScrollablePositionedList>
               alignment * primary.scrollController.position.viewportDimension,
           duration: duration,
           curve: curve);
+    } else if (widget.jumpToDistantItems) {
+      _jumpTo(index: index, alignment: alignment);
+      await SchedulerBinding.instance.endOfFrame;
     } else {
       final scrollAmount = _screenScrollCount *
           primary.scrollController.position.viewportDimension;

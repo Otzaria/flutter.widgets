@@ -15,6 +15,7 @@ void main() {
     int initialIndex = 0,
     double cacheExtentScreens = 2,
     double? minCacheExtent,
+    bool jumpToDistantItems = false,
   }) async {
     tester.view.devicePixelRatio = 1.0;
     tester.view.physicalSize = const Size(screenWidth, screenHeight);
@@ -29,6 +30,7 @@ void main() {
           initialScrollIndex: initialIndex,
           cacheExtentScreens: cacheExtentScreens,
           minCacheExtent: minCacheExtent,
+          jumpToDistantItems: jumpToDistantItems,
           itemBuilder: (context, index) => SizedBox(
             height: itemHeight,
             child: Text('Item $index'),
@@ -40,6 +42,11 @@ void main() {
 
   bool isBuilt(int index) =>
       find.text('Item $index', skipOffstage: false).evaluate().isNotEmpty;
+
+  final fadeTransitionFinder = find.descendant(
+    of: find.byType(ScrollablePositionedList),
+    matching: find.byType(FadeTransition),
+  );
 
   group('cacheExtentScreens', () {
     testWidgets('defaults to two screens on each side',
@@ -137,6 +144,67 @@ void main() {
       final indices =
           itemPositionsListener.itemPositions.value.map((p) => p.index);
       expect(indices.toSet(), {for (var i = 100; i < 110; i++) i});
+    });
+  });
+
+  group('jumpToDistantItems', () {
+    testWidgets('scrollTo jumps to an item that is not laid out',
+        (WidgetTester tester) async {
+      final itemScrollController = ItemScrollController();
+      await pumpList(
+        tester,
+        itemScrollController: itemScrollController,
+        jumpToDistantItems: true,
+      );
+
+      var completed = false;
+      itemScrollController
+          .scrollTo(index: 200, duration: const Duration(seconds: 1))
+          .then((_) => completed = true);
+      await tester.pump();
+
+      expect(fadeTransitionFinder, findsOneWidget);
+      expect(find.text('Item 200'), findsOneWidget);
+      expect(tester.getTopLeft(find.text('Item 200')).dy, 0);
+      expect(completed, isTrue);
+    });
+
+    testWidgets('scrollTo still animates to an item that is laid out',
+        (WidgetTester tester) async {
+      final itemScrollController = ItemScrollController();
+      await pumpList(
+        tester,
+        itemScrollController: itemScrollController,
+        jumpToDistantItems: true,
+      );
+
+      var completed = false;
+      itemScrollController
+          .scrollTo(index: 20, duration: const Duration(seconds: 1))
+          .then((_) => completed = true);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 750));
+
+      expect(completed, isFalse);
+      expect(tester.getTopLeft(find.text('Item 20')).dy, greaterThan(0));
+
+      await tester.pumpAndSettle();
+      expect(completed, isTrue);
+      expect(tester.getTopLeft(find.text('Item 20')).dy, 0);
+    });
+
+    testWidgets('defaults to the cross-fade', (WidgetTester tester) async {
+      final itemScrollController = ItemScrollController();
+      await pumpList(tester, itemScrollController: itemScrollController);
+
+      itemScrollController.scrollTo(
+          index: 200, duration: const Duration(seconds: 1));
+      await tester.pump();
+      await tester.pump();
+
+      expect(fadeTransitionFinder, findsNWidgets(2));
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(find.text('Item 200')).dy, 0);
     });
   });
 }
