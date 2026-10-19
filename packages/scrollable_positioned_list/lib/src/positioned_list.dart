@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
@@ -144,17 +145,21 @@ class _PositionedListState extends State<PositionedList> {
 
   bool updateScheduled = false;
 
+  /// Whether the scheduled update must notify even if no position changed.
+  bool _notifyUnchanged = false;
+  List<ItemPosition>? _lastPositions;
+
   @override
   void initState() {
     super.initState();
     scrollController = widget.controller ?? ScrollController();
-    scrollController.addListener(_schedulePositionNotificationUpdate);
+    scrollController.addListener(_onScroll);
     _schedulePositionNotificationUpdate();
   }
 
   @override
   void dispose() {
-    scrollController.removeListener(_schedulePositionNotificationUpdate);
+    scrollController.removeListener(_onScroll);
     super.dispose();
   }
 
@@ -163,6 +168,11 @@ class _PositionedListState extends State<PositionedList> {
     super.didUpdateWidget(oldWidget);
     _schedulePositionNotificationUpdate();
   }
+
+  // Positions are rounded to whole pixels, so sub-pixel scroll frames often
+  // leave them unchanged; listeners are not notified for those frames.
+  void _onScroll() =>
+      _schedulePositionNotificationUpdate(notifyUnchanged: false);
 
   @override
   Widget build(BuildContext context) => RegistryWidget(
@@ -309,7 +319,8 @@ class _PositionedListState extends State<PositionedList> {
               ? widget.padding?.copyWith(right: 0) ?? EdgeInsets.all(0)
               : widget.padding?.copyWith(left: 0) ?? EdgeInsets.all(0);
 
-  void _schedulePositionNotificationUpdate() {
+  void _schedulePositionNotificationUpdate({bool notifyUnchanged = true}) {
+    _notifyUnchanged |= notifyUnchanged;
     if (!updateScheduled) {
       updateScheduled = true;
       SchedulerBinding.instance.addPostFrameCallback((_) {
@@ -366,8 +377,12 @@ class _PositionedListState extends State<PositionedList> {
                     scrollController.position.viewportDimension));
           }
         }
-        widget.itemPositionsNotifier?.itemPositions.value = positions;
+        final notifyUnchanged = _notifyUnchanged;
+        _notifyUnchanged = false;
         updateScheduled = false;
+        if (!notifyUnchanged && listEquals(positions, _lastPositions)) return;
+        _lastPositions = positions;
+        widget.itemPositionsNotifier?.itemPositions.value = positions;
       });
     }
   }

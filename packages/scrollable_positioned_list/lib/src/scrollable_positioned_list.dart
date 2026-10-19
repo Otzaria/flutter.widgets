@@ -16,7 +16,7 @@ import 'post_mount_callback.dart';
 import 'scroll_offset_notifier.dart';
 
 /// Number of screens to scroll when scrolling a long distance.
-const int _screenScrollCount = 2;
+const double _screenScrollCount = 2;
 
 /// A scrollable list of widgets similar to [ListView], except scroll control
 /// and position reporting is based on index rather than pixel offset.
@@ -57,7 +57,10 @@ class ScrollablePositionedList extends StatefulWidget {
     this.addAutomaticKeepAlives = true,
     this.addRepaintBoundaries = true,
     this.minCacheExtent,
+    this.cacheExtentScreens = _screenScrollCount,
+    this.jumpToDistantItems = false,
   })  : assert(itemCount != null),
+        assert(cacheExtentScreens >= 0),
         assert(itemBuilder != null),
         itemPositionsNotifier = itemPositionsListener as ItemPositionsNotifier?,
         scrollOffsetNotifier = scrollOffsetListener as ScrollOffsetNotifier?,
@@ -87,7 +90,10 @@ class ScrollablePositionedList extends StatefulWidget {
     this.addAutomaticKeepAlives = true,
     this.addRepaintBoundaries = true,
     this.minCacheExtent,
+    this.cacheExtentScreens = _screenScrollCount,
+    this.jumpToDistantItems = false,
   })  : assert(itemCount != null),
+        assert(cacheExtentScreens >= 0),
         assert(itemBuilder != null),
         assert(separatorBuilder != null),
         itemPositionsNotifier = itemPositionsListener as ItemPositionsNotifier?,
@@ -185,6 +191,24 @@ class ScrollablePositionedList extends StatefulWidget {
   /// in builds of widgets that would otherwise already be built in the
   /// cache extent.
   final double? minCacheExtent;
+
+  /// The cache extent of the underlying scroll lists, in viewport lengths on
+  /// each side of the viewport.
+  ///
+  /// Every jump lays out this many viewports of items before and after the
+  /// target, so a smaller value makes [ItemScrollController.jumpTo] cheaper.
+  /// [ItemScrollController.scrollTo] animates directly only to items that are
+  /// already laid out; farther items are reached with the two-list fade.
+  /// [minCacheExtent] still applies as a lower bound. Defaults to 2.
+  final double cacheExtentScreens;
+
+  /// Whether [ItemScrollController.scrollTo] jumps to an item that is not laid
+  /// out instead of cross-fading to it in a second list.
+  ///
+  /// The cross-fade lays out a second list around the target while both lists
+  /// animate. When true, only the jump's layout is paid, and the returned
+  /// future completes after the frame that shows the target. Defaults to false.
+  final bool jumpToDistantItems;
 
   @override
   State<StatefulWidget> createState() => _ScrollablePositionedListState();
@@ -482,7 +506,7 @@ class _ScrollablePositionedListState extends State<ScrollablePositionedList>
         (widget.scrollDirection == Axis.vertical
                 ? constraints.maxHeight
                 : constraints.maxWidth) *
-            _screenScrollCount,
+            widget.cacheExtentScreens,
         widget.minCacheExtent ?? 0,
       );
 
@@ -554,6 +578,9 @@ class _ScrollablePositionedListState extends State<ScrollablePositionedList>
               alignment * primary.scrollController.position.viewportDimension,
           duration: duration,
           curve: curve);
+    } else if (widget.jumpToDistantItems) {
+      _jumpTo(index: index, alignment: alignment);
+      await SchedulerBinding.instance.endOfFrame;
     } else {
       final scrollAmount = _screenScrollCount *
           primary.scrollController.position.viewportDimension;
@@ -641,7 +668,8 @@ class _ScrollablePositionedListState extends State<ScrollablePositionedList>
   void _updatePositions() {
     final itemPositions = primary.itemPositionsNotifier.itemPositions.value
         .where((ItemPosition position) =>
-            position.itemLeadingEdge < 1 && position.itemTrailingEdge > 0);
+            position.itemLeadingEdge < 1 && position.itemTrailingEdge > 0)
+        .toList();
     if (itemPositions.isNotEmpty) {
       PageStorage.of(context).writeState(
           context,
